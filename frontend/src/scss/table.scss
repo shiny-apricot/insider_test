@@ -1,0 +1,190 @@
+$screen-sm-min: 768px;
+$shadow: 0 2px 3px rgba(0, 0, 0, .2);
+$gray-border: darken(#f8f8f8, 10%);
+$gray-light: rgba(0, 0, 0, .35);
+$faded-yellow: lighten(#f1c40f, 40%);
+
+// thx, @HugoGiraudel
+@mixin scrollbars($size, $foreground-color, $background-color: mix($foreground-color, white, 50%)) {
+  ::-webkit-scrollbar {
+      width:  $size;
+      height: $size;
+  }
+
+  ::-webkit-scrollbar-thumb {
+      background: $foreground-color;
+  }
+
+  ::-webkit-scrollbar-track {
+      background: $background-color;
+  }
+
+  // For Internet Explorer
+  body {
+    scrollbar-face-color: $foreground-color;
+    scrollbar-track-color: $background-color;
+  }
+}
+
+@include scrollbars(.15em, slategray);
+
+body,
+html {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: "Roboto";
+}
+
+.wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  background: #f8f8f8;
+}
+
+button.btn {
+  box-shadow: $shadow;
+  border: 0;
+  border-radius: 0px;
+  i {
+    margin-right: 3px;
+  }
+}
+
+body.large-screen {
+  .table-wrapper {
+    max-width: 800px;
+    display: flex;
+  }
+  .card-list-table {
+    background: white;
+    tbody tr {
+      background: transparent;
+      box-shadow: none;
+      margin: 0;
+      &:nth-of-type(even) {
+        background: $gray-border;
+      }
+    }
+    thead {
+      display: table-header-group;
+      th:last-child {
+        box-shadow: none;
+      }
+      th {
+        border-bottom: 1px solid $gray-border;
+        padding: 12px 24px;
+      }
+    }
+    tbody {
+      tr {
+        display: table-row;
+        padding-bottom: 0;
+        &:nth-of-type(even) {
+          background: #fff;
+        }
+      }
+      td {
+        border-bottom: 1px solid $gray-border;
+        cursor: pointer;
+        display: table-cell;
+        padding: 20px 24px;
+        transition: background .2s ease-out;
+        vertical-align: middle;
+        &:after {
+          display: none;
+        }
+        &:before {
+          content: '';
+        }
+      }
+      tr:hover td {
+        background: $faded-yellow;
+      }
+    }
+  }
+}
+
+.buttons {
+  margin: 10px 0 50px;
+}
+
+.table-wrapper {
+  max-width: 1000px;
+  width: 80%;
+  margin: 0 auto 0;
+  margin-top: 20px;
+  max-height: 500px;
+  padding: 30px 60px 0px 60px;
+  overflow-y: scroll;
+  position: relative;
+  transition: all .2s ease-out;
+  @media(min-width: $screen-sm-min) {
+    background: white;
+    box-shadow: $shadow;
+  }
+}
+
+// use table horizontally instead of vertically
+.card-list-table {
+    width: 100%;
+    table-layout: auto;
+    
+    thead {
+      th:first-child {
+        width: 300px;
+      }
+    }
+
+    tbody {
+        tr {
+            display: table-row;
+            padding-bottom: 0;
+            // fit the cells depending on content
+            &:nth-of-type(even) {
+                background: #fff;
+            }
+        }
+        td {
+            border: 1px solid $gray-border;
+            cursor: pointer;
+            display: table-cell;
+            padding: 5px 6px;
+            transition: background .2s ease-out;
+            vertical-align: middle;  
+            white-space: nowrap;
+            &:after {
+                content: '';                  
+                display: table-cell;
+                width: 100%;
+                height: 100%;
+            }
+            &:before {
+            content: '';
+            }
+        }
+        tr:hover td {
+            background: $faded-yellow;
+        }
+    }
+}
+
+.championship-banner{
+  background: #f8f8f8;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 5px;
+  box-shadow: $shadow;
+  h3 {
+    margin: 0;
+  }
+}
