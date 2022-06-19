@@ -4,6 +4,7 @@ import './App.css';
 import Table from "./Table";
 import './scss/table.scss';
 
+
 function App() {
   // get team_table as json,
   // the json include "team_name", "played", "won", "drown", "lost", "GF", "GA", "GD", "points"
@@ -12,6 +13,12 @@ function App() {
   });
   const [league_matches, setLeagueMatches] = useState({
     matches: [],
+  });
+
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const [predictions, setPredictions] = useState({
+    predictions: [],
   });
 
   const [is_done, setIsDone] = useState(false);
@@ -35,9 +42,9 @@ function App() {
     setTeamTable({
       teams: data.teams,
     });
+    // reload page
+    // window.location.reload();
   }
-
-  console.log("team_table: ", team_table);
 
   var week_number = 4;
   // create a string var as "week match result"
@@ -110,7 +117,16 @@ function App() {
   const prediction_columns = React.useMemo(() => [
     {
       Header: "Prediction",
-      accessor: "predictions"
+      columns: [
+          {
+            Header: "Home",
+            accessor: "team",
+          },
+          {
+            Header: "Championship Prediction",
+            accessor: "prediction",
+          },
+      ]
     }
   ], []);
 
@@ -163,9 +179,10 @@ function App() {
       matches: data,
     });
     fetch_table();
+    get_predictions();
   }
 
-
+  
   const play_all = async () => {
     const response = await fetch("/play_all", {
       method: "GET",
@@ -174,6 +191,7 @@ function App() {
       },
     })
     fetch_table();
+    check_is_done();
   }
 
   const championship_board = () => {
@@ -194,6 +212,40 @@ function App() {
       );
     }
   }
+
+  const get_predictions = async () => {
+    setIsLoading(true);
+    const response = await fetch("/predictions", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+    const data = await response.json();
+    console.log("predictions: ", );
+    setIsLoading(false);
+    setPredictions({
+      predictions: data
+    });
+  }
+
+  // if predictions is empty, then show loading indicator
+  const return_prediction_table = () => {
+    if(isLoading){
+      return (
+        <div class="loading">
+          <h2>Loading...</h2>
+        </div>
+      );
+    }
+    else{
+      return (
+        <Table columns={prediction_columns} data={predictions.predictions} />
+      );
+    }
+  }
+
+
   // user should select team_count to fetch numbers teams
   // it start from 1 to 20
   
@@ -211,7 +263,7 @@ function App() {
           <Table columns={standing_columns} data={team_table.teams} />
           <div class="second-table-wrapper">
             <Table columns={matches_columns} data={league_matches.matches} />
-            {/* <Table columns={prediction_columns} data={league_matches.matches} /> */}
+            {return_prediction_table()}
           </div>
           <button id="playall" class="btn btn-primary btn-lg btn-block f-l" type="button" onClick={play_all}>
               Play All

@@ -36,7 +36,7 @@ def get_next_week():
     for game in games:
         match_dict = {"home": game[0], "away": game[1], "score": f"{game[2]}-{game[3]}"}
         game_list.append(match_dict)
-    print("game_list=", game_list)
+
     return jsonify(game_list)
 
 
@@ -54,3 +54,14 @@ def is_done():
 def play_all():
     league_generator.play_all()
     return "Done"
+
+
+@app.route("/predictions", methods=["GET"])
+def predictions():
+    predictions = league_generator.predict_championship(simulation_count=20)
+    pred_list = []
+    for pred in predictions:
+        pred_dict = {"team": pred[0], "prediction": pred[1]}
+        pred_list.append(pred_dict)
+    print(f"## pred list == {pred_list}")
+    return jsonify(pred_list)

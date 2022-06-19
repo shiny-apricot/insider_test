@@ -69,7 +69,17 @@ class db:
         conn.close()
 
     def increment_team_stats(
-        self, points, team_name, played=1, won=0, drown=0, lost=0, GF=0, GA=0, GD=0
+        self,
+        points,
+        team_name,
+        played=1,
+        won=0,
+        drown=0,
+        lost=0,
+        GF=0,
+        GA=0,
+        GD=0,
+        table_name="teams",
     ):
         """
         Increment the stats of a team.
@@ -81,14 +91,14 @@ class db:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         c.execute(
-            f"UPDATE teams SET played=played+?, won=won+?, drown=drown+?, lost=lost+?, GF=GF+?, GA=GA+?, GD=GD+?, points=points+? WHERE team_name=?",
+            f"UPDATE {table_name} SET played = played + ?, won = won + ?, drown = drown + ?, lost = lost + ?, GF = GF + ?, GA = GA + ?, GD = GD + ?, points = points + ? WHERE team_name = ?",
             (played, won, drown, lost, GF, GA, GD, points, team_name),
         )
         conn.commit()
         conn.close()
 
     def fetch_teams(
-        self, json=False, db_filename="database.db", table="teams", sort=False
+        self, json=False, db_filename="database.db", table_name="teams", sort=False
     ):
         """
         Return a list of all teams in the database.
@@ -99,7 +109,7 @@ class db:
 
         team_list = []
         c = conn.cursor()
-        c.execute(f"SELECT * FROM {table}")
+        c.execute(f"SELECT * FROM {table_name}")
         rows = c.fetchall()
 
         for row in rows:
@@ -115,9 +125,57 @@ class db:
                 "points": row[8],
             }
             team_list.append(team_dict)
+
         if sort:
+            # if two team has the same point, sort by GD, if GD is equal, sort by GF
+            team_list.sort(key=lambda x: x["GF"], reverse=True)
+            team_list.sort(key=lambda x: x["GD"], reverse=True)
             team_list.sort(key=lambda x: x["points"], reverse=True)
+
         if json:
             return dict(teams=team_list)
         # else
         return team_list
+
+    # copy all the information from the table to a new table
+    def copy_table(self, table="teams", new_table="teams_copy"):
+        """
+        Copy the table to a new table.
+        The connection has to be established inside this function.
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute(f"SELECT * FROM {table}")
+        rows = c.fetchall()
+        c.execute(f"DROP TABLE IF EXISTS {new_table}")
+        c.execute(
+            f"""CREATE TABLE IF NOT EXISTS {new_table} (
+                team_name TEXT,
+                played INTEGER,
+                won INTEGER,
+                drown INTEGER,
+                lost INTEGER,
+                GF INTEGER,
+                GA INTEGER,
+                GD INTEGER,
+                points INTEGER
+            )"""
+        )
+        for row in rows:
+            c.execute(
+                f"INSERT INTO {new_table} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    row[0],
+                    row[1],
+                    row[2],
+                    row[3],
+                    row[4],
+                    row[5],
+                    row[6],
+                    row[7],
+                    row[8],
+                ),
+            )
+        conn.commit()
+        conn.close()
+

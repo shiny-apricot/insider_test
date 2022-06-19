@@ -2,8 +2,9 @@ import random
 import itertools
 import pandas as pd
 import os
-from flask import jsonify
 import json
+import time
+from api.time_counter import Timer
 
 
 class Team:
@@ -17,15 +18,21 @@ class Team:
         self.GA = GA
         self.GD = GD
         self.points = points
+        # self.championship_percentage = 0
 
 
 class LeagueGenerator:
     def __init__(self, db, avg_file="avg_goals.csv", std_file="std_goals.csv"):
         self.db = db
         self.team_names = []
-        self.scores = []
         self.week = 1
         self.is_done = False
+        self.scores = []
+        self.simul_scores = []
+        self.past_scores = []
+        self.simul_past_scores = []
+        self.timer = Timer()
+
         # get avg and std csv files of all teams in Premier League
         try:
             avg_path = os.path.join(os.getcwd(), "league_generator", avg_file)
@@ -36,6 +43,9 @@ class LeagueGenerator:
 
         self.df_avg = pd.read_csv(avg_path, index_col=0)
         self.df_std = pd.read_csv(std_path, index_col=0)
+
+        # multiply df_std by 2
+        self.df_std = self.df_std * 2
 
     def pick_random_teams(self, team_count=4):
         self.team_count = team_count
@@ -61,6 +71,7 @@ class LeagueGenerator:
         # reset the league
         self.is_done = False
         self.week = 1
+        self.past_scores = []
 
         if pick_random:
             self.pick_random_teams(team_count=4)
@@ -78,9 +89,14 @@ class LeagueGenerator:
             print("No teams are picked. Try func => pick_random_teams()")
             return
 
-    def generate_scores(self):
-        # decide the scores for each match by considering the average, standard deviation, away and home
+    def generate_scores(self, seed=None, simulation=False):
+        # decide the scores for each match
+        # by considering the average, standard deviation, away and home
+        self.simul_scores = []
         for match in self.team_match_perm:
+            if seed is not None:
+                # change random seed with millisecond
+                random.seed(seed)
             # calculate the scores for each match
             # score for home team
             score_home = random.normalvariate(
@@ -99,8 +115,12 @@ class LeagueGenerator:
             score_away = round(score_away)
             if score_away < 0:
                 score_away = 0
-            # append the scores to the list
-            self.scores.append([match[0], match[1], score_home, score_away])
+
+            if simulation:
+                self.simul_scores.append([match[0], match[1], score_home, score_away])
+            else:
+                # append the scores to the list
+                self.scores.append([match[0], match[1], score_home, score_away])
         return self.scores
 
     def play_a_week(self):
@@ -114,12 +134,12 @@ class LeagueGenerator:
         # enumerate from reverse
         game_count = len(self.scores)
         for game_index in reversed(range(game_count)):
-            print(f"Game index {game_index}")
-            print(f"Scores: {self.scores}")
             game = self.scores[game_index]
             if game[0] in teams_left and game[1] in teams_left:
                 self.scores.pop(game_index)
                 game_list.append(game)
+                self.past_scores.append(game)
+
                 teams_left.remove(game[0])
                 teams_left.remove(game[1])
                 if len(game_list) == 2:
@@ -137,21 +157,49 @@ class LeagueGenerator:
         for i in range(7):
             self.play_a_week()
 
-    # predict championship based on df_avg and df_std
-    def predict_championship(self):
-        # get the top 4 teams
-        teams = self.db.fetch_teams(sorted=True)
-        # get the average and standard deviation of the top 4 teams
-        avg_top4 = self.df_avg.loc[teams[:4]]
-        std_top4 = self.df_std.loc[teams[:4]]
-        # predict the championship
+    def predict_championship(self, simulation_count=10):
+        """
+        Predict the championship percentages of the teams.
+        """
+        teams = self.db.fetch_teams(sort=True)
+        self.db.copy_table(new_table="teams_simulation")
+
         championship = []
 
-    def update_stats(self, game_list):
+        for i in range(simulation_count):
+            self.generate_scores(
+                simulation=True, seed=time.time_ns()
+            )  # to self.simul_scores
+
+            # pop the scores that are already played
+            for game in self.simul_scores:
+                if game in self.past_scores:
+                    self.simul_scores.remove(game)
+
+            self.update_stats(self.simul_scores, table_name="teams_simulation")
+            teams = self.db.fetch_teams(sort=True, table_name="teams_simulation")
+            print(f"SIMUL_CHAMPION = {teams[0]['team_name']}")
+            championship.append(teams[0]["team_name"])
+            # reset simulation table
+            self.db.copy_table(new_table="teams_simulation")
+
+        print(f"Championship: {championship}")
+        chm_percentage = []
+        # calculate the percentage of each team in the championship
+        championship_count = len(championship)
+        for team in teams:
+            percentage = championship.count(team["team_name"]) / championship_count
+            chm_percentage.append([team["team_name"], percentage])
+
+        print(f"Championship percentage: {chm_percentage}")
+        return chm_percentage
+
+    def update_stats(self, game_list, table_name="teams"):
         for game in game_list:
             # determine who is won
             if game[2] == game[3]:
                 self.db.increment_team_stats(
+                    table_name=table_name,
                     team_name=game[0],
                     drown=1,
                     played=1,
@@ -161,6 +209,7 @@ class LeagueGenerator:
                     GD=game[2] - game[3],
                 )
                 self.db.increment_team_stats(
+                    table_name=table_name,
                     team_name=game[1],
                     drown=1,
                     played=1,
@@ -173,6 +222,7 @@ class LeagueGenerator:
                 winner = game[0]
                 loser = game[1]
                 self.db.increment_team_stats(
+                    table_name=table_name,
                     team_name=winner,
                     played=1,
                     won=1,
@@ -182,6 +232,7 @@ class LeagueGenerator:
                     GD=game[2] - game[3],
                 )
                 self.db.increment_team_stats(
+                    table_name=table_name,
                     team_name=loser,
                     played=1,
                     lost=1,
@@ -194,6 +245,7 @@ class LeagueGenerator:
                 winner = game[1]
                 loser = game[0]
                 self.db.increment_team_stats(
+                    table_name=table_name,
                     team_name=winner,
                     played=1,
                     won=1,
@@ -203,6 +255,7 @@ class LeagueGenerator:
                     GD=game[3] - game[2],
                 )
                 self.db.increment_team_stats(
+                    table_name=table_name,
                     team_name=loser,
                     played=1,
                     lost=1,
